@@ -1,0 +1,22 @@
+{
+  "app": {
+    "title": "Guía del Museo"
+  },
+  "home": {
+    "description": "Escanea el código QR junto a cada exhibición para ver su información detallada.",
+    "scanButton": "Escanear código QR"
+  },
+  "scanner": {
+    "guide": "Apunta la cámara al código QR",
+    "preparing": "Preparando cámara...",
+    "errorInvalidUrl": "No se encontró un documento en este código QR.",
+    "errorCamera": "Acceso a la cámara denegado. Por favor, permite el acceso en la configuración del navegador."
+  },
+  "viewer": {
+    "loading": "Cargando documento...",
+    "page": "{{current}} / {{total}}",
+    "errorLoad": "No se pudo cargar el documento.",
+    "retry": "Reintentar",
+    "back": "Volver"
+  }
+}

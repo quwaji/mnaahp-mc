@@ -1,0 +1,22 @@
+{
+  "app": {
+    "title": "博物馆导览"
+  },
+  "home": {
+    "description": "扫描展品旁边的二维码，查看详细信息。",
+    "scanButton": "扫描二维码"
+  },
+  "scanner": {
+    "guide": "将相机对准二维码",
+    "preparing": "正在准备相机...",
+    "errorInvalidUrl": "此二维码中未找到文档。",
+    "errorCamera": "相机访问被拒绝。请在浏览器设置中允许相机权限。"
+  },
+  "viewer": {
+    "loading": "正在加载文档...",
+    "page": "{{current}} / {{total}}",
+    "errorLoad": "无法加载文档。",
+    "retry": "重试",
+    "back": "返回"
+  }
+}
