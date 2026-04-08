@@ -126,33 +126,65 @@
   color: #fff;
 }
 
-/* Reader Mode */
-.reader-content__image {
-  display: block;
-  width: 100%;
-  height: auto;
-  background: #e0e0e0;
-}
-
-.reader-content__text {
-  padding: 1.25rem 1.25rem 1.5rem;
+/* Reader Mode: カード（画像＋テキスト） */
+.reader-card {
+  display: flex;
+  gap: 0.875rem;
+  padding: 1rem;
   background: #fff;
+  align-items: flex-start;
 }
 
-.reader-content__paragraph {
-  font-size: 1rem;
-  line-height: 1.75;
-  margin-bottom: 0.9rem;
+.reader-card__image {
+  width: 25vw;
+  max-width: 120px;
+  min-width: 72px;
+  height: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: #eee;
+}
+
+.reader-card__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.reader-card__paragraph {
+  font-size: 0.9rem;
+  line-height: 1.45;
   color: #333;
+  margin-bottom: 0.4rem;
 }
 
-.reader-content__paragraph:last-child {
+.reader-card__paragraph:last-child {
   margin-bottom: 0;
 }
 
-.reader-content__divider {
-  height: 0.5rem;
-  background: #d0d0d0;
+/* Reader Mode: 独立テキストセクション */
+.reader-text-section {
+  padding: 0.875rem 1rem;
+  background: #fff;
+}
+
+.reader-text-section__paragraph {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #444;
+  margin-bottom: 0.4rem;
+}
+
+.reader-text-section__paragraph:last-child {
+  margin-bottom: 0;
+}
+
+/* アイテム間の区切り線 */
+.reader-divider {
+  margin: 0;
+  border: none;
+  border-top: 1px solid #ddd;
+  background: #f0f0f0;
+  height: 4px;
 }
 
 /* ローディング / エラー */

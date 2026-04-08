@@ -92,32 +92,44 @@ async function showReaderMode(app) {
     const contentItems = await extractPageContent(page)
 
     for (const item of contentItems) {
-      if (item.type === 'image') {
+      if (item.type === 'card') {
         readerBlobUrls.push(item.blobUrl)
+        const card = document.createElement('div')
+        card.className = 'reader-card'
         const img = document.createElement('img')
-        img.className = 'reader-content__image'
+        img.className = 'reader-card__image'
         img.src = item.blobUrl
-        fragment.appendChild(img)
+        card.appendChild(img)
+        if (item.texts.length > 0) {
+          const textEl = document.createElement('div')
+          textEl.className = 'reader-card__text'
+          item.texts.forEach(t => {
+            const p = document.createElement('p')
+            p.className = 'reader-card__paragraph'
+            p.textContent = t
+            textEl.appendChild(p)
+          })
+          card.appendChild(textEl)
+        }
+        fragment.appendChild(card)
       } else {
-        const lines = item.content.split('\n').filter(l => l.trim())
-        if (!lines.length) continue
-        const textEl = document.createElement('div')
-        textEl.className = 'reader-content__text'
-        lines.forEach(line => {
+        // 独立テキストセクション
+        if (!item.texts.length) continue
+        const section = document.createElement('div')
+        section.className = 'reader-text-section'
+        item.texts.forEach(t => {
           const p = document.createElement('p')
-          p.className = 'reader-content__paragraph'
-          p.textContent = line
-          textEl.appendChild(p)
+          p.className = 'reader-text-section__paragraph'
+          p.textContent = t
+          section.appendChild(p)
         })
-        fragment.appendChild(textEl)
+        fragment.appendChild(section)
       }
-    }
 
-    // ページ区切り（最終ページ以外）
-    if (i < pdfDoc.numPages) {
-      const divider = document.createElement('div')
-      divider.className = 'reader-content__divider'
-      fragment.appendChild(divider)
+      // アイテム間の区切り線
+      const hr = document.createElement('hr')
+      hr.className = 'reader-divider'
+      fragment.appendChild(hr)
     }
   }
 
