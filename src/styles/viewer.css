@@ -101,6 +101,65 @@
   opacity: 0.8;
 }
 
+/* モード切替ボタン */
+.viewer__mode-toggle {
+  display: flex;
+  border: 1.5px solid #555;
+  border-radius: 2rem;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mode-btn {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: bold;
+  background: transparent;
+  color: #888;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-btn.active {
+  background: #e63946;
+  color: #fff;
+}
+
+/* Reader Mode */
+.reader-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #f5f5f0;
+  color: #222;
+}
+
+.reader-page {
+  margin-bottom: 0.5rem;
+}
+
+.reader-page__image {
+  width: 100%;
+  display: block;
+}
+
+.reader-page__text {
+  padding: 1.25rem 1.25rem 1.75rem;
+  background: #fff;
+}
+
+.reader-page__paragraph {
+  font-size: 1rem;
+  line-height: 1.75;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.reader-page__paragraph:last-child {
+  margin-bottom: 0;
+}
+
 /* ローディング / エラー */
 .viewer__state {
   flex: 1;
