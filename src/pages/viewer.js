@@ -89,20 +89,36 @@ async function showReaderMode(app) {
 
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i)
-    const { imageUrl, paragraphs } = await extractPageContent(page)
-    readerBlobUrls.push(imageUrl)
+    const contentItems = await extractPageContent(page)
 
-    const pageEl = document.createElement('div')
-    pageEl.className = 'reader-page'
-    pageEl.innerHTML = `
-      <img class="reader-page__image" src="${imageUrl}" alt="Page ${i}" loading="lazy" />
-      ${paragraphs.length > 0 ? `
-        <div class="reader-page__text">
-          ${paragraphs.map(p => `<p class="reader-page__paragraph">${p}</p>`).join('')}
-        </div>
-      ` : ''}
-    `
-    fragment.appendChild(pageEl)
+    for (const item of contentItems) {
+      if (item.type === 'image') {
+        readerBlobUrls.push(item.blobUrl)
+        const img = document.createElement('img')
+        img.className = 'reader-content__image'
+        img.src = item.blobUrl
+        fragment.appendChild(img)
+      } else {
+        const lines = item.content.split('\n').filter(l => l.trim())
+        if (!lines.length) continue
+        const textEl = document.createElement('div')
+        textEl.className = 'reader-content__text'
+        lines.forEach(line => {
+          const p = document.createElement('p')
+          p.className = 'reader-content__paragraph'
+          p.textContent = line
+          textEl.appendChild(p)
+        })
+        fragment.appendChild(textEl)
+      }
+    }
+
+    // ページ区切り（最終ページ以外）
+    if (i < pdfDoc.numPages) {
+      const divider = document.createElement('div')
+      divider.className = 'reader-content__divider'
+      fragment.appendChild(divider)
+    }
   }
 
   container.innerHTML = ''
