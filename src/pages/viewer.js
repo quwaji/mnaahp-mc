@@ -2,6 +2,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import { t, getLang, setLang, applyToDOM } from '../i18n/index.js'
 import { navigate } from '../router.js'
 import { parsePdfUrls, pickPdfUrl } from '../services/htmlParser.js'
+import { extractPageContent } from '../services/pdfExtractor.js'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -14,14 +15,21 @@ const LANGS = [
   { code: 'zh', label: '中文' },
 ]
 
+// モジュールスコープの状態
 let pdfDoc = null
 let currentPage = 1
 let urlMap = {}
+let mode = 'reader'  // 'reader' | 'pdf'
+let readerBlobUrls = []  // メモリ解放用
 
-async function renderPage(container, pageNum) {
+// --- PDF Mode（現行・ページ送り）---
+
+async function renderPdfPage(container, pageNum) {
   const page = await pdfDoc.getPage(pageNum)
   const scale = window.devicePixelRatio || 1
-  const viewport = page.getViewport({ scale: (container.clientWidth / page.getViewport({ scale: 1 }).width) * scale })
+  const viewport = page.getViewport({
+    scale: (container.clientWidth / page.getViewport({ scale: 1 }).width) * scale,
+  })
 
   const canvas = document.createElement('canvas')
   canvas.width = viewport.width
@@ -33,14 +41,112 @@ async function renderPage(container, pageNum) {
   return canvas
 }
 
-async function loadAndRender(app, pdfUrl) {
+async function showPdfMode(app) {
   const container = app.querySelector('.viewer__canvas-container')
   const footer = app.querySelector('.viewer__footer')
-  const pageInfo = app.querySelector('.viewer__page-info')
+  container.innerHTML = ''
+  footer.style.display = 'flex'
+
+  const canvas = await renderPdfPage(container, currentPage)
+  container.appendChild(canvas)
+  updatePdfFooter(app)
+}
+
+function updatePdfFooter(app) {
+  app.querySelector('#prev-btn').disabled = currentPage <= 1
+  app.querySelector('#next-btn').disabled = currentPage >= pdfDoc.numPages
+  app.querySelector('.viewer__page-info').textContent =
+    t('viewer.page', { current: currentPage, total: pdfDoc.numPages })
+}
+
+async function goToPage(app, pageNum) {
+  if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return
+  currentPage = pageNum
+  const container = app.querySelector('.viewer__canvas-container')
+  container.innerHTML = ''
+  const canvas = await renderPdfPage(container, currentPage)
+  container.appendChild(canvas)
+  container.scrollTo(0, 0)
+  updatePdfFooter(app)
+}
+
+// --- Reader Mode（全ページ縦スクロール）---
+
+async function showReaderMode(app) {
+  const container = app.querySelector('.viewer__canvas-container')
+  const footer = app.querySelector('.viewer__footer')
+  footer.style.display = 'none'
+  app.querySelector('.viewer__page-info').textContent = ''
 
   container.innerHTML = `<div class="viewer__state"><p data-i18n="viewer.loading"></p></div>`
   applyToDOM()
-  if (footer) footer.style.display = 'none'
+
+  // 以前のBlob URLを解放
+  readerBlobUrls.forEach(url => URL.revokeObjectURL(url))
+  readerBlobUrls = []
+
+  const fragment = document.createDocumentFragment()
+
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const page = await pdfDoc.getPage(i)
+    const contentItems = await extractPageContent(page)
+
+    for (const item of contentItems) {
+      if (item.type === 'card') {
+        readerBlobUrls.push(item.blobUrl)
+        const card = document.createElement('div')
+        card.className = 'reader-card'
+        const img = document.createElement('img')
+        img.className = 'reader-card__image'
+        img.src = item.blobUrl
+        card.appendChild(img)
+        if (item.texts.length > 0) {
+          const textEl = document.createElement('div')
+          textEl.className = 'reader-card__text'
+          item.texts.forEach(t => {
+            const p = document.createElement('p')
+            p.className = 'reader-card__paragraph'
+            p.textContent = t
+            textEl.appendChild(p)
+          })
+          card.appendChild(textEl)
+        }
+        fragment.appendChild(card)
+      } else {
+        // 独立テキストセクション
+        if (!item.texts.length) continue
+        const section = document.createElement('div')
+        section.className = 'reader-text-section'
+        item.texts.forEach(t => {
+          const p = document.createElement('p')
+          p.className = 'reader-text-section__paragraph'
+          p.textContent = t
+          section.appendChild(p)
+        })
+        fragment.appendChild(section)
+      }
+
+      // アイテム間の区切り線
+      const hr = document.createElement('hr')
+      hr.className = 'reader-divider'
+      fragment.appendChild(hr)
+    }
+  }
+
+  container.innerHTML = ''
+  container.appendChild(fragment)
+  container.scrollTo(0, 0)
+}
+
+// --- PDF読み込み ---
+
+async function loadPdf(app, pdfUrl) {
+  const container = app.querySelector('.viewer__canvas-container')
+  const footer = app.querySelector('.viewer__footer')
+
+  container.innerHTML = `<div class="viewer__state"><p data-i18n="viewer.loading"></p></div>`
+  applyToDOM()
+  footer.style.display = 'none'
 
   try {
     pdfDoc = await pdfjsLib.getDocument({
@@ -50,12 +156,12 @@ async function loadAndRender(app, pdfUrl) {
     }).promise
 
     currentPage = 1
-    container.innerHTML = ''
-    if (footer) footer.style.display = 'flex'
-    updateFooter(app)
 
-    const canvas = await renderPage(container, currentPage)
-    container.appendChild(canvas)
+    if (mode === 'reader') {
+      await showReaderMode(app)
+    } else {
+      await showPdfMode(app)
+    }
   } catch {
     container.innerHTML = `
       <div class="viewer__state">
@@ -64,32 +170,11 @@ async function loadAndRender(app, pdfUrl) {
       </div>
     `
     applyToDOM()
-    app.querySelector('#retry-btn')?.addEventListener('click', () => loadAndRender(app, pdfUrl))
+    app.querySelector('#retry-btn')?.addEventListener('click', () => loadPdf(app, pdfUrl))
   }
 }
 
-function updateFooter(app) {
-  const prevBtn = app.querySelector('#prev-btn')
-  const nextBtn = app.querySelector('#next-btn')
-  const pageInfo = app.querySelector('.viewer__page-info')
-
-  if (!pdfDoc) return
-  prevBtn.disabled = currentPage <= 1
-  nextBtn.disabled = currentPage >= pdfDoc.numPages
-  pageInfo.textContent = t('viewer.page', { current: currentPage, total: pdfDoc.numPages })
-}
-
-async function goToPage(app, pageNum) {
-  if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return
-  currentPage = pageNum
-
-  const container = app.querySelector('.viewer__canvas-container')
-  container.innerHTML = ''
-  const canvas = await renderPage(container, currentPage)
-  container.appendChild(canvas)
-  container.scrollTo(0, 0)
-  updateFooter(app)
-}
+// --- メイン描画 ---
 
 export async function renderViewer(app) {
   const htmlUrl = sessionStorage.getItem('currentHtmlUrl')
@@ -101,7 +186,11 @@ export async function renderViewer(app) {
   app.innerHTML = `
     <div class="viewer">
       <div class="viewer__header">
-        <button class="viewer__back" id="back-btn">← <span data-i18n="viewer.back"></span></button>
+        <button class="viewer__back" id="back-btn">←</button>
+        <div class="viewer__mode-toggle">
+          <button class="mode-btn${mode === 'reader' ? ' active' : ''}" data-mode="reader">Reader</button>
+          <button class="mode-btn${mode === 'pdf' ? ' active' : ''}" data-mode="pdf">PDF</button>
+        </div>
         <span class="viewer__page-info"></span>
         <div class="viewer__lang-switcher">
           ${LANGS.map(l => `
@@ -121,14 +210,35 @@ export async function renderViewer(app) {
 
   applyToDOM()
 
+  // 戻るボタン
   app.querySelector('#back-btn').addEventListener('click', () => {
+    readerBlobUrls.forEach(url => URL.revokeObjectURL(url))
+    readerBlobUrls = []
     pdfDoc = null
     navigate('/scanner')
   })
 
+  // モード切替
+  app.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (btn.dataset.mode === mode || !pdfDoc) return
+      mode = btn.dataset.mode
+      app.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+
+      if (mode === 'reader') {
+        await showReaderMode(app)
+      } else {
+        await showPdfMode(app)
+      }
+    })
+  })
+
+  // ページ送り（PDF Mode）
   app.querySelector('#prev-btn').addEventListener('click', () => goToPage(app, currentPage - 1))
   app.querySelector('#next-btn').addEventListener('click', () => goToPage(app, currentPage + 1))
 
+  // 言語切替
   app.querySelectorAll('.viewer__lang-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       setLang(btn.dataset.lang)
@@ -136,7 +246,7 @@ export async function renderViewer(app) {
       btn.classList.add('active')
 
       const pdfUrl = pickPdfUrl(urlMap, getLang())
-      await loadAndRender(app, pdfUrl)
+      await loadPdf(app, pdfUrl)
     })
   })
 
@@ -156,6 +266,5 @@ export async function renderViewer(app) {
   }
 
   sessionStorage.setItem('pdfUrlMap', JSON.stringify(urlMap))
-  const pdfUrl = pickPdfUrl(urlMap, getLang())
-  await loadAndRender(app, pdfUrl)
+  await loadPdf(app, pickPdfUrl(urlMap, getLang()))
 }
